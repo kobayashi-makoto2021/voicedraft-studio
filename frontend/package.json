@@ -1,0 +1,17 @@
+{
+  "name": "voicedraft-studio-frontend",
+  "version": "0.1.0",
+  "description": "VoiceDraft Studio - Frontend",
+  "type": "module",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "serve": "npx http-server dist"
+  },
+  "keywords": ["voicedraft", "frontend"],
+  "author": "aiaruku",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
