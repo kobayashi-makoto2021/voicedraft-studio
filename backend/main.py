@@ -1,6 +1,6 @@
 """FastAPI main application."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -9,7 +9,10 @@ import os
 load_dotenv()
 
 # Import routers
-from routers import drafts, generate_text, generate_image
+try:
+    from .routers import drafts, generate_text, generate_image
+except ImportError:  # pragma: no cover - local dev fallback
+    from routers import drafts, generate_text, generate_image
 
 app = FastAPI(
     title="VoiceDraft Studio API",
