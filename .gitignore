@@ -40,3 +40,6 @@ npm-debug.log*
 
 # Generated images (local persistence)
 backend/static/images/
+
+# Local SQLite database
+backend/data/

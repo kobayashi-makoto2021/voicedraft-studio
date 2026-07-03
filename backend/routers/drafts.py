@@ -8,12 +8,12 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 
 try:
-    from ..models import DraftCreate, DraftResponse, ExtractPointsRequest
-    from ..services.in_memory_store import store
+    from ..models import DraftCreate, DraftResponse, ExtractPointsRequest, GeneratedTextResponse
+    from ..services.db_store import store
     from ..services.claude_client import ClaudeClient
 except ImportError:  # pragma: no cover - local dev fallback
-    from models import DraftCreate, DraftResponse, ExtractPointsRequest
-    from services.in_memory_store import store
+    from models import DraftCreate, DraftResponse, ExtractPointsRequest, GeneratedTextResponse
+    from services.db_store import store
     from services.claude_client import ClaudeClient
 
 router = APIRouter()
@@ -45,6 +45,15 @@ def get_draft(draft_id: str, tenant_id: str = "aiaruku"):
     if not draft or draft["tenant_id"] != tenant_id:
         raise HTTPException(status_code=404, detail="draft not found")
     return DraftResponse(**draft)
+
+
+@router.get("/{draft_id}/texts", response_model=List[GeneratedTextResponse])
+def list_generated_texts(draft_id: str, tenant_id: str = "aiaruku"):
+    """下書きに紐づく生成テキスト一覧（新しい順）。書庫からの再開用"""
+    draft = store.get_draft(draft_id)
+    if not draft or draft["tenant_id"] != tenant_id:
+        raise HTTPException(status_code=404, detail="draft not found")
+    return [GeneratedTextResponse(**t) for t in store.list_generated_texts(draft_id)]
 
 
 @router.post("/{draft_id}/extract")

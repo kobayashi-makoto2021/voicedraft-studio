@@ -14,6 +14,15 @@ app.innerHTML = `
       <div style="padding: 8px 12px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 14px;">MVP / Local Demo</div>
     </header>
 
+    <section style="margin-top: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 16px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="margin: 0; font-size: 18px;">書庫</h2>
+        <button id="newDraftBtn" style="padding: 8px 12px; border: none; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; font-size: 13px;">＋ 新規作成</button>
+      </div>
+      <p style="margin: 6px 0 10px; color: #6b7280; font-size: 13px;">保存済みの下書き。開くと続きから再開できます。</p>
+      <div id="libraryList" style="display: flex; flex-direction: column; gap: 6px;"></div>
+    </section>
+
     <section style="margin-top: 24px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px;">
       <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 16px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
         <h2 style="margin: 0 0 8px; font-size: 18px;">1. 口述内容を入力</h2>
@@ -199,6 +208,99 @@ const api = async (path: string, options?: RequestInit) => {
   return data;
 };
 
+// --- 書庫（下書き一覧・再開） ---
+const libraryList = document.getElementById('libraryList') as HTMLDivElement;
+const newDraftBtn = document.getElementById('newDraftBtn') as HTMLButtonElement;
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: '下書き',
+  extracted: '要点抽出済み',
+  generated: '本文生成済み',
+};
+
+const resetWorkspace = () => {
+  draftId = null;
+  extractedPoints = null;
+  generatedBody = null;
+  rawTextArea.value = '';
+  draftResult.textContent = '';
+  extractResult.textContent = '';
+  generateResult.textContent = '';
+  imagePromptArea.value = '';
+  imageGrid.innerHTML = '';
+  selectedImage.textContent = '';
+  imageStatus.textContent = '';
+  setButtonState(extractBtn, false);
+  setButtonState(blogBtn, false);
+  setButtonState(crowdfundingBtn, false);
+  setButtonState(promptDraftBtn, false);
+  setButtonState(imageBtn, false);
+};
+
+const openDraft = async (id: string) => {
+  try {
+    const draft = await api(`/drafts/${id}`);
+    resetWorkspace();
+    draftId = draft.draft_id;
+    rawTextArea.value = draft.raw_text;
+    draftResult.textContent = `再開中: ${draft.draft_id}（${STATUS_LABELS[draft.status] ?? draft.status}）`;
+    setButtonState(extractBtn, true);
+    setButtonState(blogBtn, true);
+    setButtonState(crowdfundingBtn, true);
+
+    if (draft.extracted_points) {
+      extractedPoints = draft.extracted_points;
+      extractResult.textContent = draft.extracted_points;
+      setButtonState(promptDraftBtn, true);
+    }
+
+    const texts = await api(`/drafts/${id}/texts`);
+    if (texts.length > 0) {
+      generatedBody = texts[0].body;
+      generateResult.textContent = `【${texts[0].output_type}】${texts[0].title}\n\n${texts[0].body}`;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    draftResult.textContent = error instanceof Error ? error.message : 'Error';
+  }
+};
+
+const refreshLibrary = async () => {
+  try {
+    const drafts = await api('/drafts');
+    libraryList.innerHTML = '';
+    if (drafts.length === 0) {
+      libraryList.innerHTML = '<p style="margin: 0; color: #9ca3af; font-size: 13px;">まだ下書きがありません。</p>';
+      return;
+    }
+    for (const draft of drafts) {
+      const row = document.createElement('div');
+      row.style.cssText =
+        'display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 13px;';
+      const date = new Date(draft.updated_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const excerpt = draft.raw_text.slice(0, 40) + (draft.raw_text.length > 40 ? '…' : '');
+      row.innerHTML = `
+        <span style="color: #6b7280; white-space: nowrap;">${date}</span>
+        <span style="padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 12px; white-space: nowrap;">${STATUS_LABELS[draft.status] ?? draft.status}</span>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+        <button style="padding: 6px 10px; border: none; border-radius: 8px; background: #2563eb; color: white; cursor: pointer; font-size: 12px;">開く</button>
+      `;
+      (row.children[2] as HTMLSpanElement).textContent = excerpt;
+      (row.children[3] as HTMLButtonElement).addEventListener('click', () => openDraft(draft.draft_id));
+      libraryList.appendChild(row);
+    }
+  } catch (error) {
+    libraryList.innerHTML = `<p style="margin: 0; color: #dc2626; font-size: 13px;">${error instanceof Error ? error.message : 'Error'}</p>`;
+  }
+};
+
+newDraftBtn.addEventListener('click', () => {
+  resetWorkspace();
+  rawTextArea.focus();
+});
+
+refreshLibrary();
+
 (document.getElementById('createDraftBtn') as HTMLButtonElement).addEventListener('click', async () => {
   const rawText = (document.getElementById('rawText') as HTMLTextAreaElement).value;
   draftResult.textContent = '作成中...';
@@ -213,6 +315,7 @@ const api = async (path: string, options?: RequestInit) => {
     setButtonState(extractBtn, true);
     setButtonState(blogBtn, true);
     setButtonState(crowdfundingBtn, true);
+    refreshLibrary();
   } catch (error) {
     draftResult.textContent = error instanceof Error ? error.message : 'Error';
   }
@@ -232,6 +335,7 @@ extractBtn.addEventListener('click', async () => {
     extractResult.textContent = JSON.stringify(data, null, 2);
     extractedPoints = data.extracted_points;
     setButtonState(promptDraftBtn, true);
+    refreshLibrary();
   } catch (error) {
     extractResult.textContent = error instanceof Error ? error.message : 'Error';
   }
@@ -327,6 +431,7 @@ blogBtn.addEventListener('click', async () => {
     });
     generateResult.textContent = JSON.stringify(data, null, 2);
     generatedBody = data.body;
+    refreshLibrary();
   } catch (error) {
     generateResult.textContent = error instanceof Error ? error.message : 'Error';
   }
@@ -345,6 +450,7 @@ crowdfundingBtn.addEventListener('click', async () => {
     });
     generateResult.textContent = JSON.stringify(data, null, 2);
     generatedBody = data.body;
+    refreshLibrary();
   } catch (error) {
     generateResult.textContent = error instanceof Error ? error.message : 'Error';
   }

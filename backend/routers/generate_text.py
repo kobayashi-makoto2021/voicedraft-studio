@@ -8,11 +8,11 @@ from fastapi import APIRouter, HTTPException
 
 try:
     from ..models import GenerateTextRequest, GeneratedTextResponse
-    from ..services.in_memory_store import store
+    from ..services.db_store import store
     from ..services.claude_client import ClaudeClient, MODEL
 except ImportError:  # pragma: no cover - local dev fallback
     from models import GenerateTextRequest, GeneratedTextResponse
-    from services.in_memory_store import store
+    from services.db_store import store
     from services.claude_client import ClaudeClient, MODEL
 
 router = APIRouter()

@@ -16,7 +16,7 @@ try:
         ImagePromptDraftRequest,
         ImagePromptDraftResponse,
     )
-    from ..services.in_memory_store import store
+    from ..services.db_store import store
     from ..services.claude_client import ClaudeClient
     from ..services.dalle_client import DALLEClient
 except ImportError:  # pragma: no cover - local dev fallback
@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover - local dev fallback
         ImagePromptDraftRequest,
         ImagePromptDraftResponse,
     )
-    from services.in_memory_store import store
+    from services.db_store import store
     from services.claude_client import ClaudeClient
     from services.dalle_client import DALLEClient
 
