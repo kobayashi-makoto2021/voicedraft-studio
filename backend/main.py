@@ -1,7 +1,10 @@
 """FastAPI main application."""
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
 
@@ -20,14 +23,20 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# CORS設定
+# CORS設定（本番では ALLOWED_ORIGINS にフロントのURLをカンマ区切りで設定）
+allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番環境では制限すること
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 生成画像などの静的ファイル配信
+static_dir = Path(__file__).resolve().parent / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # ルーター登録
 app.include_router(drafts.router, prefix="/drafts", tags=["drafts"])

@@ -57,6 +57,7 @@ class ImagePromptDraftRequest(BaseModel):
     extracted_points: str
     image_type: str  # "slide" or "illustration"
     tenant_id: str = "aiaruku"
+    body_text: Optional[str] = None  # 生成済み本文（スライド生成時に文字を取り込むため）
 
 
 class ImagePromptDraftResponse(BaseModel):
@@ -71,6 +72,7 @@ class GenerateImageRequest(BaseModel):
     draft_id: Optional[str] = None
     text_id: Optional[str] = None
     tenant_id: str = "aiaruku"
+    n: int = Field(default=3, ge=1, le=4)  # 生成枚数（グリッド表示して選択）
 
 
 class GeneratedImageResponse(BaseModel):
@@ -82,3 +84,8 @@ class GeneratedImageResponse(BaseModel):
     prompt: str
     image_url: str
     created_at: datetime
+
+
+class ImageCandidatesResponse(BaseModel):
+    """レスポンス: 生成画像の候補一覧（グリッド表示用）"""
+    images: List[GeneratedImageResponse]

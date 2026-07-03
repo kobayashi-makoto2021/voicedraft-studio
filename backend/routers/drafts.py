@@ -1,14 +1,20 @@
 """Drafts API routes."""
 
+import os
+import sys
+
+import anthropic
 from fastapi import APIRouter, HTTPException
 from typing import List
 
 try:
     from ..models import DraftCreate, DraftResponse, ExtractPointsRequest
     from ..services.in_memory_store import store
+    from ..services.claude_client import ClaudeClient
 except ImportError:  # pragma: no cover - local dev fallback
     from models import DraftCreate, DraftResponse, ExtractPointsRequest
     from services.in_memory_store import store
+    from services.claude_client import ClaudeClient
 
 router = APIRouter()
 
@@ -26,14 +32,14 @@ async def create_draft(request: DraftCreate):
 
 
 @router.get("", response_model=List[DraftResponse])
-async def list_drafts(tenant_id: str = "aiaruku"):
+def list_drafts(tenant_id: str = "aiaruku"):
     """下書き一覧取得"""
     drafts = store.list_drafts(tenant_id)
     return [DraftResponse(**draft) for draft in drafts]
 
 
 @router.get("/{draft_id}", response_model=DraftResponse)
-async def get_draft(draft_id: str, tenant_id: str = "aiaruku"):
+def get_draft(draft_id: str, tenant_id: str = "aiaruku"):
     """下書き詳細取得"""
     draft = store.get_draft(draft_id)
     if not draft or draft["tenant_id"] != tenant_id:
@@ -43,23 +49,28 @@ async def get_draft(draft_id: str, tenant_id: str = "aiaruku"):
 
 @router.post("/{draft_id}/extract")
 async def extract_points(draft_id: str, request: ExtractPointsRequest):
-    """要点抽出を実行"""
+    """要点抽出を実行 - Claude APIを使用"""
     draft = store.get_draft(draft_id)
     if not draft or draft["tenant_id"] != request.tenant_id:
         raise HTTPException(status_code=404, detail="draft not found")
 
     raw_text = draft["raw_text"]
-    points = [
-        "- 主題: " + (raw_text.splitlines()[0] if raw_text.splitlines() else "口述内容"),
-        "- 要点: 1. 伝えたい内容を整理する",
-        "- 要点: 2. 具体例を添えて説明する",
-        "- 要点: 3. まとめを明確に伝える",
-    ]
+    claude_client = ClaudeClient()
+    try:
+        points = claude_client.extract_points(
+            raw_text=raw_text,
+            org_name=os.getenv("ORG_NAME", "教育機関"),
+            org_description=os.getenv("ORG_DESCRIPTION", "プログラミング教室"),
+        )
+    except anthropic.APIStatusError as e:
+        print(f"[claude extract] Claude API error status={e.status_code} body={e.message}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=f"Claude API error: {e.message}")
+
     store.update_draft(
         draft_id,
         {
-            "extracted_points": "\n".join(points),
+            "extracted_points": points,
             "status": "extracted",
         },
     )
-    return {"draft_id": draft_id, "extracted_points": "\n".join(points)}
+    return {"draft_id": draft_id, "extracted_points": points}
